@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Carpet Planner</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+    h1 { text-align: center; color: #333; }
+    .room { background: #fff; padding: 10px; margin-bottom: 10px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .room input, .room select { margin: 5px; padding: 5px; }
+    .room button { margin: 5px; padding: 5px 10px; }
+    #addRoomBtn, #calculateBtn { margin-top: 20px; padding: 10px 15px; background: #0078d7; color: white; border: none; border-radius: 6px; cursor: pointer; }
+    #addRoomBtn:hover, #calculateBtn:hover { background: #005fa3; }
+    #summary { margin-top: 30px; background: #fff; padding: 15px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .highlight { font-weight: bold; color: #0078d7; }
+  </style>
+</head>
+<body>
+  <h1>Carpet Cutting Planner</h1>
+
+  <div id="roomList"></div>
+  <button id="addRoomBtn">➕ Add Room</button>
+  <button id="calculateBtn">📏 Calculate Totals</button>
+
+  <div id="summary">
+    <h2>Summary</h2>
+    <p>Total Carpet Length (before wastage): <span id="totalUsed" class="highlight">0</span> m</p>
+    <p>Total with 10% wastage/finishing: <span id="totalWithExtra" class="highlight">0</span> m</p>
+  </div>
+
+  <script>
+    let rooms = [];
+
+    function renderRooms() {
+      const list = document.getElementById('roomList');
+      list.innerHTML = '';
+      rooms.forEach((room, index) => {
+        const div = document.createElement('div');
+        div.className = 'room';
+        div.innerHTML = `
+          <label>Name: <input type="text" value="${room.name}" onchange="updateRoom(${index}, 'name', this.value)"></label><br>
+          <label>Length (m): <input type="number" step="0.01" value="${room.length}" onchange="updateRoom(${index}, 'length', parseFloat(this.value))"></label>
+          <label>Width (m): <input type="number" step="0.01" value="${room.width}" onchange="updateRoom(${index}, 'width', parseFloat(this.value))"></label><br>
+          <label>Run Carpet Along: 
+            <select onchange="updateRoom(${index}, 'run', this.value)">
+              <option value="length" ${room.run==='length'?'selected':''}>Length</option>
+              <option value="width" ${room.run==='width'?'selected':''}>Width</option>
+            </select>
+          </label><br>
+          <button onclick="removeRoom(${index})">❌ Remove</button>
+        `;
+        list.appendChild(div);
+      });
+    }
+
+    function updateRoom(index, field, value) {
+      rooms[index][field] = value;
+    }
+
+    function addRoom() {
+      rooms.push({name:'New Room', length:0, width:0, run:'length'});
+      renderRooms();
+    }
+
+    function removeRoom(index) {
+      rooms.splice(index,1);
+      renderRooms();
+    }
+
+    function calculateTotals() {
+      let totalUsed = 0;
+      rooms.forEach(room => {
+        if(room.length>0 && room.width>0){
+          let used = room.run==='length' ? room.length : room.width;
+          totalUsed += used;
+        }
+      });
+      document.getElementById('totalUsed').textContent = totalUsed.toFixed(2);
+      document.getElementById('totalWithExtra').textContent = (totalUsed*1.10).toFixed(2);
+    }
+
+    document.getElementById('addRoomBtn').addEventListener('click', addRoom);
+    document.getElementById('calculateBtn').addEventListener('click', calculateTotals);
+
+    // Initialize with sample rooms
+    rooms = [
+      {name:"Rumpus", length:4.36, width:4.36, run:"length"},
+      {name:"Bed 4", length:4.09, width:3.00, run:"length"},
+      {name:"Bed 3", length:3.87, width:3.00, run:"length"},
+      {name:"Bed 2", length:4.09, width:3.00, run:"length"},
+      {name:"Master Bed", length:4.47, width:3.76, run:"length"},
+      {name:"Wardrobe", length:1.00, width:0.90, run:"length"},
+      {name:"WIR", length:2.93, width:2.18, run:"length"},
+      {name:"Study Room", length:4.00, width:3.95, run:"length"}
+    ];
+    renderRooms();
+  </script>
+</body>
+</html>

@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Multi-Room Carpet Calculator</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 2rem; background:#f9fafb; color:#111; }
+    h1 { margin-bottom:1rem; }
+    .room { border:1px solid #ccc; padding:1rem; margin-bottom:1rem; background:#fff; border-radius:8px; }
+    .room input { margin:0.2rem; padding:0.3rem; }
+    .room button { margin-left:0.5rem; }
+    .controls { margin:1rem 0; }
+    .result { margin-top:1rem; padding:1rem; border:1px solid #ccc; background:#fff; }
+    em { color:#555; }
+  </style>
+</head>
+<body>
+  <h1>Multi-Room Carpet Calculator</h1>
+
+  <label>Carpet roll width (m): <input id="rollWidth" type="number" step="0.01" value="4"></label>
+  <label>Round length up to (m): <input id="roundTo" type="number" step="0.01" value="0.1"></label>
+
+  <div class="controls">
+    <button onclick="addRoom()">Add Room</button>
+    <button onclick="calculateTotal()">Calculate Total</button>
+  </div>
+
+  <div id="rooms"></div>
+
+  <div class="result" id="output"></div>
+
+<script>
+let roomId = 0;
+let rooms = [];
+
+function addRoom() {
+  const id = roomId++;
+  rooms.push({id, name:`Room ${id+1}`, length:5, width:4});
+  renderRooms();
+}
+
+function renameRoom(id, newName) {
+  const room = rooms.find(r=>r.id===id);
+  if(room) room.name = newName;
+}
+
+function removeRoom(id) {
+  rooms = rooms.filter(r=>r.id!==id);
+  renderRooms();
+}
+
+function updateRoom(id, field, value) {
+  const room = rooms.find(r=>r.id===id);
+  if(room) room[field] = parseFloat(value);
+}
+
+function renderRooms() {
+  const container = document.getElementById('rooms');
+  container.innerHTML = "";
+  rooms.forEach(room=>{
+    const div = document.createElement('div');
+    div.className = "room";
+    div.innerHTML = `
+      <label>Name: <input type="text" value="${room.name}" 
+        onchange="renameRoom(${room.id}, this.value)"></label><br>
+      <label>Length (m): <input type="number" step="0.01" value="${room.length}" 
+        onchange="updateRoom(${room.id}, 'length', this.value)"></label>
+      <label>Width (m): <input type="number" step="0.01" value="${room.width}" 
+        onchange="updateRoom(${room.id}, 'width', this.value)"></label>
+      <button onclick="removeRoom(${room.id})">Remove</button>
+    `;
+    container.appendChild(div);
+  });
+}
+
+function ceilDiv(a,b){ return Math.ceil(a/b); }
+function roundUp(val, step){ return Math.ceil(val/step)*step; }
+
+function calcRoom(room, rollWidth, roundTo){
+  const L = room.length, W = room.width;
+  let drops = Math.floor(W / rollWidth);
+  let leftover = W - drops*rollWidth;
+  let totalLen = drops * L;
+  let note = "";
+  let wastageStrips = "";
+
+  if(leftover>0){
+    if(leftover<=1){
+      let shortLen = (L * leftover / rollWidth) * 2;
+      totalLen += shortLen;
+      note = `Leftover ${leftover.toFixed(2)} m handled with short piece ${shortLen.toFixed(2)} m.`;
+      wastageStrips = `Cut ${shortLen.toFixed(2)} m piece → split into 2 strips (${(shortLen/2).toFixed(2)}×${rollWidth} each). Joined side‑by‑side to cover ${leftover.toFixed(2)}×${L} space.`;
+    } else {
+      totalLen += L;
+      note = `Leftover ${leftover.toFixed(2)} m → full drop ${L.toFixed(2)} m.`;
+      wastageStrips = `One full drop used, offcut width ${leftover.toFixed(2)} m × length ${L.toFixed(2)} m.`;
+    }
+  }
+  totalLen = roundUp(totalLen, roundTo);
+  return {roomLen:totalLen, note, wastageStrips};
+}
+
+function calculateTotal(){
+  const rollWidth = parseFloat(document.getElementById('rollWidth').value);
+  const roundTo = parseFloat(document.getElementById('roundTo').value);
+  let total=0;
+  let details="";
+  rooms.forEach((room,i)=>{
+    const res = calcRoom(room, rollWidth, roundTo);
+    total += res.roomLen;
+    details += `<p><strong>${room.name}</strong>: ${room.length}×${room.width} m → ${res.roomLen.toFixed(2)} m used.<br>
+                 ${res.note}<br><em>Wastage strip: ${res.wastageStrips}</em></p>`;
+  });
+  const withWastage = total*1.10; // add 10%
+  document.getElementById('output').innerHTML =
+    `${details}<hr><strong>Total carpet length (before wastage): ${total.toFixed(2)} m</strong><br>
+     <strong>Total with 10% wastage/finishing: ${withWastage.toFixed(2)} m</strong>`;
+}
+
+// initialize with one room
+addRoom();
+</script>
+</body>
+</html>

@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Carpet Planner with Allocation Logic</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f4f4;
+      margin: 20px;
+    }
+    h1 {
+      color: #333;
+    }
+    .log {
+      background: #fff;
+      border: 1px solid #ccc;
+      padding: 15px;
+      margin-top: 20px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    .log-entry {
+      margin-bottom: 10px;
+      padding: 8px;
+      border-bottom: 1px dashed #ddd;
+    }
+    .used {
+      color: green;
+      font-weight: bold;
+    }
+    .new {
+      color: blue;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <h1>Carpet Planner (Allocation Logic Demo)</h1>
+  <button onclick="runPlanner()">Run Demo</button>
+  <div class="log" id="log"></div>
+
+  <script>
+    // Roll width constant
+    const ROLL_WIDTH = 3.66;
+
+    // Stored remainders
+    let remainders = [];
+
+    // Utility: log output
+    function log(message, type="") {
+      const logDiv = document.getElementById("log");
+      const entry = document.createElement("div");
+      entry.className = "log-entry " + type;
+      entry.textContent = message;
+      logDiv.appendChild(entry);
+    }
+
+    // Check if a remainder can cover a room
+    function findRemainder(roomLength, roomWidth) {
+      return remainders.find(r =>
+        r.width >= roomWidth && r.length >= roomLength && r.status === "stored"
+      );
+    }
+
+    // Process a room
+    function processRoom(name, length, width) {
+      const toleranceLength = parseFloat((length + 0.05).toFixed(2)); // add trimming tolerance
+      const remainder = findRemainder(toleranceLength, width);
+
+      if (remainder) {
+        // Use stored strip
+        remainder.status = "used";
+        log(`${name}: Covered using remainder strip ${remainder.width}×${remainder.length} from ${remainder.origin}.`, "used");
+      } else {
+        // Cut new drop
+        const dropLength = parseFloat((length + 0.05).toFixed(2));
+        log(`${name}: New drop cut ${dropLength}×${ROLL_WIDTH}.`, "new");
+
+        // Calculate offcut width
+        let offcutWidth = parseFloat((ROLL_WIDTH - width).toFixed(2));
+        if (offcutWidth > 0) {
+          const newRemainder = {
+            width: offcutWidth,
+            length: length,
+            origin: name,
+            status: "stored"
+          };
+          remainders.push(newRemainder);
+          log(`Remainder stored: ${newRemainder.width}×${newRemainder.length} (from ${name}).`);
+        }
+      }
+    }
+
+    // Demo run
+    function runPlanner() {
+      document.getElementById("log").innerHTML = "";
+      remainders = [];
+
+      // Example rooms
+      processRoom("BED1", 4.12, 3.38);
+      processRoom("Dining", 5.73, 3.92);
+      processRoom("Hallway", 3.85, 1.00);
+
+      log("=== Allocation Complete ===");
+    }
+  </script>
+</body>
+</html>
