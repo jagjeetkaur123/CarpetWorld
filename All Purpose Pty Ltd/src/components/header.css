@@ -1,0 +1,105 @@
+.header-container {
+    /* Yeh woh pura section hai jahan lines aur text hai */
+    width: 200px;
+    /* Chota default width for vertical placement */
+    height: 100%;
+    /* Agar ye business card ke side mein hai */
+    position: relative;
+    display: flex;
+    /* Flexbox use kiya hai */
+    padding: 10px 0;
+}
+
+
+/* Lines: Blue aur Yellow */
+
+.vertical-line-set {
+    display: flex;
+    flex-direction: column;
+    width: 15px;
+    /* Total line width */
+    height: 100%;
+    position: absolute;
+    left: 0;
+}
+
+.blue-line {
+    background-color: #0047AB;
+    height: 70%;
+}
+
+.yellow-line {
+    background-color: #FFD700;
+    height: 30%;
+}
+
+
+/* Text Area jise rotate karna hai */
+
+.text-area {
+    position: absolute;
+    top: 50%;
+    /* Center vertically */
+    right: 0;
+    /* Right edge of the container */
+    /* Rotation - Card ke design ke liye */
+    transform: translateY(-50%) rotate(-90deg);
+    transform-origin: 100% 0;
+    /* Right edge se rotate hoga */
+    white-space: nowrap;
+    /* Text ko ek line mein rakhega */
+    text-align: right;
+}
+
+.company-name {
+    font-size: 1.2em;
+    font-weight: 900;
+    margin: 0;
+    letter-spacing: 1px;
+    color: #333;
+}
+
+.service-tag {
+    font-size: 0.7em;
+    margin: 0;
+    color: #555;
+}
+
+
+/* --- RESPONSIVENESS (Media Query) --- */
+
+
+/* Jab screen size choti ho (e.g., mobile devices), tab rotation hatado */
+
+@media (max-width: 768px) {
+    .header-container {
+        width: 100%;
+        /* Full width le lega */
+        height: auto;
+        padding: 10px;
+        align-items: center;
+        justify-content: center;
+        flex-direction: row;
+    }
+    .vertical-line-set {
+        /* Chote screen par lines ko horizontal kar do ya hata do */
+        display: none;
+    }
+    .text-area {
+        /* Rotation hata diya */
+        transform: none;
+        position: static;
+        top: auto;
+        right: auto;
+        text-align: center;
+        /* Chote screen par service tag upar aayega */
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        width: 100%;
+    }
+    .company-name {
+        font-size: 1.5em;
+        /* Thoda bada */
+    }
+}
