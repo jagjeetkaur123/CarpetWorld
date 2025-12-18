@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Carpet Planner (Universal Logic + Offcut Reuse)</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 2rem; background:#f9fafb; color:#111; }
+    h1 { margin-bottom:1rem; }
+    .room { border:1px solid #ccc; padding:1rem; margin-bottom:1rem; background:#fff; border-radius:8px; }
+    .room input, .room select { margin:0.2rem; padding:0.3rem; }
+    .room button { margin-left:0.5rem; }
+    .controls { margin:1rem 0; }
+    .result { margin-top:1rem; padding:1rem; border:1px solid #ccc; background:#fff; }
+    .room-output { margin-bottom:1rem; }
+    ul { margin:0.5rem 0 0.5rem 1.5rem; }
+  </style>
+</head>
+<body>
+  <h1>Multi-Room Carpet Calculator</h1>
+
+  <label>Carpet roll width (m): <input id="rollWidth" type="number" step="0.01" value="4"></label>
+  <label>Round length up to (m): <input id="roundTo" type="number" step="0.01" value="0.1"></label>
+
+  <div class="controls">
+    <button onclick="addRoom()">Add Room</button>
+    <button onclick="calculateTotal()">Calculate Total</button>
+  </div>
+
+  <div id="rooms"></div>
+
+  <div class="result" id="output"></div>
+
+<script>
+let roomId = 0;
+let rooms = [];
+
+function addRoom() {
+  const id = roomId++;
+  rooms.push({id, name:`Room ${id+1}`, length:0, width:0, orientation:'length'});
+  renderRooms();
+}
+
+function renameRoom(id, newName) {
+  const room = rooms.find(r=>r.id===id);
+  if(room) room.name = newName;
+}
+
+function removeRoom(id) {
+  rooms = rooms.filter(r=>r.id!==id);
+  renderRooms();
+}
+
+function updateRoom(id, field, value) {
+  const room = rooms.find(r=>r.id===id);
+  if(field==='orientation'){
+    room[field] = value;
+  } else {
+    room[field] = parseFloat(value);
+  }
+}
+
+function renderRooms() {
+  const container = document.getElementById('rooms');
+  container.innerHTML = "";
+  rooms.forEach(room=>{
+    const div = document.createElement('div');
+    div.className = "room";
+    div.innerHTML = `
+      <label>Name: <input type="text" value="${room.name}" 
+        onchange="renameRoom(${room.id}, this.value)"></label><br>
+      <label>Length (m): <input type="number" step="0.01" value="${room.length}" 
+        onchange="updateRoom(${room.id}, 'length', this.value)"></label>
+      <label>Width (m): <input type="number" step="0.01" value="${room.width}" 
+        onchange="updateRoom(${room.id}, 'width', this.value)"></label>
+      <label>Orientation: 
+        <select onchange="updateRoom(${room.id}, 'orientation', this.value)">
+          <option value="length" ${room.orientation==='length'?'selected':''}>Along Length</option>
+          <option value="width" ${room.orientation==='width'?'selected':''}>Along Width</option>
+        </select>
+      </label>
+      <button onclick="removeRoom(${room.id})">Remove</button>
+    `;
+    container.appendChild(div);
+  });
+}
+
+function roundUp(val, step){ return Math.ceil(val/step)*step; }
+
+function calcRoom(room, rollWidth, roundTo, offcuts) {
+  const L = room.length, W = room.width;
+  let runSide, acrossSide;
+
+  if (room.orientation === 'length') {
+    runSide = L;
+    acrossSide = W;
+  } else {
+    runSide = W;
+    acrossSide = L;
+  }
+
+  let drops = Math.floor(acrossSide / rollWidth);
+  let totalLen = drops * runSide;
+  let leftoverWidth = acrossSide - drops * rollWidth;
+
+  let note = "", wastageStrips = "", remainderNote = "";
+
+  // --- GLOBAL REUSE LOGIC ---
+  for (let i = 0; i < offcuts.length; i++) {
+    const strip = offcuts[i];
+    if (strip.width >= rollWidth && strip.length >= runSide) {
+      note = `One drop replaced using offcut from ${strip.from} (${strip.width.toFixed(2)}×${strip.length.toFixed(2)}).`;
+      wastageStrips = "Reduced new drop usage by 1.";
+      remainderNote = `Remainder strip from ${strip.from} consumed.`;
+      offcuts.splice(i, 1);
+      drops -= 1;
+      totalLen = drops * runSide;
+      break;
+    }
+    if (strip.width >= leftoverWidth && leftoverWidth > 0) {
+      note = `Gap ${leftoverWidth.toFixed(2)}×${runSide.toFixed(2)} filled using offcut from ${strip.from} (${strip.width.toFixed(2)}×${strip.length.toFixed(2)}). Joined lengthwise to cover full run.`;
+      wastageStrips = "No new wastage, reused existing strip.";
+      remainderNote = `Remainder strip from ${strip.from} consumed.`;
+      offcuts.splice(i, 1);
+
+      // FIX: still count the run length even if gap covered by offcut
+      totalLen = runSide;
+      break;
+    }
+  }
+  // --- END REUSE LOGIC ---
+
+  if (!note) {
+    if (acrossSide <= rollWidth) {
+      totalLen = runSide;
+      leftoverWidth = rollWidth - acrossSide;
+      if (leftoverWidth > 0.10) {
+        note = `Leftover ${leftoverWidth.toFixed(2)} m → full drop ${runSide.toFixed(2)} m.`;
+        wastageStrips = `One full drop used, offcut width ${leftoverWidth.toFixed(2)} × ${runSide.toFixed(2)} m.`;
+        offcuts.push({ from: room.name, width: leftoverWidth, length: runSide });
+        remainderNote = `Remainder strip stored: ${leftoverWidth.toFixed(2)}×${runSide.toFixed(2)} m (usable for gaps ≤ ${leftoverWidth.toFixed(2)} m).`;
+      } else {
+        note = "No usable remainder (scrap discarded).";
+        wastageStrips = "No usable wastage strip.";
+        remainderNote = "No remainder strip stored.";
+      }
+    } else if (leftoverWidth > 0) {
+      if (leftoverWidth <= 1.0) {
+        totalLen += runSide;
+        note = `Leftover ${leftoverWidth.toFixed(2)} m handled with short piece ${runSide.toFixed(2)} m.`;
+        wastageStrips = `Cut full ${runSide.toFixed(2)} m drop, trimmed into strips to cover ${leftoverWidth.toFixed(2)}×${runSide.toFixed(2)} gap.`;
+        remainderNote = "No remainder strip stored (short piece consumed).";
+      } else {
+        totalLen += runSide;
+        note = `Leftover ${leftoverWidth.toFixed(2)} m → full drop ${runSide.toFixed(2)} m.`;
+        wastageStrips = `One full drop used, offcut width ${leftoverWidth.toFixed(2)} × ${runSide.toFixed(2)} m.`;
+        offcuts.push({ from: room.name, width: leftoverWidth, length: runSide });
+        remainderNote = `Remainder strip stored: ${leftoverWidth.toFixed(2)}×${runSide.toFixed(2)} m (usable for gaps ≤ ${leftoverWidth.toFixed(2)} m).`;
+      }
+    } else {
+      note = `${drops} drop${drops !== 1 ? 's' : ''} required (each ${runSide.toFixed(2)} m).`;
+      wastageStrips = "No wastage strip required.";
+      remainderNote = "No remainder strip.";
+    }
+  }
+
+  totalLen = roundUp(totalLen, roundTo);
+  return { roomLen: totalLen, note, wastageStrips, remainderNote };
+}
+
+// COMPLETE calculateTotal FUNCTION
+function calculateTotal() {
+  const rollWidth = parseFloat(document.getElementById('rollWidth').value);
+  const roundTo = parseFloat(document.getElementById('roundTo').value);
+  let offcuts = [];
+  let grandTotal = 0;
+  let outputHTML = "";
+
+  rooms.forEach(room => {
+    const result = calcRoom(room, rollWidth, roundTo, offcuts);
+    grandTotal += result.roomLen;
+    outputHTML += `
+      <div class="room-output">
+        <h3>${room.name}</h3>
+        <ul>
+          <li><strong>Length required:</strong> ${result.roomLen.toFixed(2)} m</li>
+          <li><strong>Note:</strong> ${result.note}</li>
+          <li><strong>Wastage:</strong> ${result.wastageStrips}</li>
+          <li><strong>Remainder:</strong> ${result.remainderNote}</li>
+        </ul>
+      </div>
+    `;
+  });
+
+  outputHTML += `<h2>Total Carpet Length: ${grandTotal.toFixed(2)} m</h2>`;
+  document.getElementById('output').innerHTML = outputHTML;
+}
+addRoom();
+</script>
+</body>
+</html>
+         

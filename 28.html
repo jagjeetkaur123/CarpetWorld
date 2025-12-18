@@ -2,7 +2,6 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-<<<<<<< HEAD
   <title>Carpet Planner (Universal Logic + Offcut Reuse)</title>
   <style>
     body { font-family: Arial, sans-serif; margin: 2rem; background:#f9fafb; color:#111; }
@@ -84,11 +83,9 @@ function renderRooms() {
   });
 }
 
-function roundUp(val, step) {
-  return Math.ceil(val / step) * step;
-}
+function roundUp(val, step){ return Math.ceil(val/step)*step; }
 
-function calcRoom(room, rollWidth, roundTo, offcuts) {
+function calcRoom(room, rollWidth, roundTo, offcuts){
   const L = room.length, W = room.width;
   let runSide, acrossSide;
 
@@ -105,7 +102,7 @@ function calcRoom(room, rollWidth, roundTo, offcuts) {
   let totalLen = drops * runSide;
   let leftoverWidth = acrossSide - drops * rollWidth;
 
-  // --- REUSE LOGIC ---
+  // --- NEW REUSE LOGIC ---
   for (let i = 0; i < offcuts.length; i++) {
     const strip = offcuts[i];
 
@@ -115,7 +112,7 @@ function calcRoom(room, rollWidth, roundTo, offcuts) {
       let wastageStrips = "No new wastage, reused existing strip.";
       let remainderNote = `Remainder strip from ${strip.from} consumed.`;
       offcuts.splice(i, 1);
-      return {roomLen:0, reused:true, note, wastageStrips, remainderNote};
+      return {roomLen:0, note, wastageStrips, remainderNote};
     }
 
     // Case 2: Offcut covers just the leftover gap
@@ -124,7 +121,7 @@ function calcRoom(room, rollWidth, roundTo, offcuts) {
       let wastageStrips = "No new wastage, reused existing strip.";
       let remainderNote = `Remainder strip from ${strip.from} consumed.`;
       offcuts.splice(i, 1);
-      return {roomLen:roundUp(runSide, roundTo), reused:true, note, wastageStrips, remainderNote};
+      return {roomLen:roundUp(runSide, roundTo), note, wastageStrips, remainderNote};
     }
   }
   // --- END REUSE LOGIC ---
@@ -149,21 +146,19 @@ function calcRoom(room, rollWidth, roundTo, offcuts) {
     }
   } else if (leftoverWidth > 0) {
     if (leftoverWidth <= 1.0) {
-      // --- Short piece logic (corrected) ---
+      // Short piece logic
       let shortLen = runSide * (leftoverWidth / rollWidth);
-      let cutLen = shortLen * 2;   // actual cut length from roll
-      totalLen += cutLen;          // add full cut length to total
-
-      note = `Leftover ${leftoverWidth.toFixed(2)} m covered by cutting ${cutLen.toFixed(2)} m piece.`;
-      wastageStrips = `Cut ${cutLen.toFixed(2)} m → split into 2 strips (${shortLen.toFixed(2)}×${rollWidth.toFixed(2)} each). Joined side‑by‑side to cover ${leftoverWidth.toFixed(2)}×${runSide.toFixed(2)} space.`;
+      totalLen += shortLen;
+      note = `Leftover ${leftoverWidth.toFixed(2)} m handled with short piece ${shortLen.toFixed(2)} m.`;
+      wastageStrips = `Cut ${shortLen.toFixed(2)} m piece → split into 2 strips (${(shortLen/2).toFixed(2)}×${rollWidth.toFixed(2)} each). Joined side‑by‑side to cover ${leftoverWidth.toFixed(2)}×${runSide.toFixed(2)} space.`;
       remainderNote = "No remainder strip stored (short piece consumed).";
     } else {
-      // --- Full drop logic ---
+      // Full drop logic
       totalLen += runSide;
       note = `Leftover ${leftoverWidth.toFixed(2)} m → full drop ${runSide.toFixed(2)} m.`;
       wastageStrips = `One full drop used, offcut width ${leftoverWidth.toFixed(2)} × ${runSide.toFixed(2)} m.`;
       offcuts.push({from:room.name,width:leftoverWidth,length:runSide});
-      remainderNote = `Remainder strip stored: ${(rollWidth-leftoverWidth).toFixed(2)}×${runSide.toFixed(2)} m.`;
+      remainderNote = `Remainder strip stored: ${leftoverWidth.toFixed(2)}×${runSide.toFixed(2)} m.`;
     }
   } else {
     wastageStrips = "No wastage strip required.";
@@ -171,17 +166,17 @@ function calcRoom(room, rollWidth, roundTo, offcuts) {
   }
 
   totalLen = roundUp(totalLen, roundTo);
-  return {roomLen:totalLen, reused:false, note, wastageStrips, remainderNote};
+  return {roomLen:totalLen, note, wastageStrips, remainderNote};
 }
 
-function calculateTotal() {
+function calculateTotal(){
   const rollWidth = parseFloat(document.getElementById('rollWidth').value);
   const roundTo = parseFloat(document.getElementById('roundTo').value);
   let total = 0;
   let details = "";
   let offcuts = [];
 
-  rooms.forEach(room => {
+  rooms.forEach(room=>{
     const res = calcRoom(room, rollWidth, roundTo, offcuts);
     total += res.roomLen;
 
@@ -199,140 +194,7 @@ ${room.name}: ${room.length.toFixed(2)} × ${room.width.toFixed(2)} m → ${res.
     `${details}<hr><strong>Total carpet length (before wastage): ${total.toFixed(2)} m</strong><br>
      <strong>Total with 10% wastage/finishing: ${withWastage.toFixed(2)} m</strong>`;
 }
-
 addRoom();
 </script>
-=======
-  <title>Carpet Planner</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 20px;
-      background: #f5f5f5;
-    }
-    h1 {
-      text-align: center;
-      color: #333;
-    }
-    .room-list {
-      margin-top: 20px;
-    }
-    .room {
-      background: #fff;
-      padding: 10px;
-      margin-bottom: 10px;
-      border-radius: 6px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    .room input {
-      margin: 5px;
-      padding: 5px;
-    }
-    .room button {
-      margin: 5px;
-      padding: 5px 10px;
-    }
-    #addRoomBtn {
-      margin-top: 20px;
-      padding: 10px 15px;
-      background: #0078d7;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-    }
-    #addRoomBtn:hover {
-      background: #005fa3;
-    }
-    #summary {
-      margin-top: 30px;
-      background: #fff;
-      padding: 15px;
-      border-radius: 6px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    .highlight {
-      font-weight: bold;
-      color: #0078d7;
-    }
-  </style>
-</head>
-<body>
-  <h1>Carpet Cutting Planner</h1>
-
-  <div class="room-list" id="roomList"></div>
-  <button id="addRoomBtn">➕ Add Room</button>
-
-  <div id="summary">
-    <h2>Summary</h2>
-    <p>Total Carpet Used: <span id="totalUsed" class="highlight">0</span> m</p>
-    <p>Total Waste Strips: <span id="totalWaste" class="highlight">0</span> m²</p>
-    <p>Total with 10% Extra: <span id="totalWithExtra" class="highlight">0</span> m</p>
-  </div>
-
-  <script>
-    let rooms = [];
-
-    function renderRooms() {
-      const list = document.getElementById('roomList');
-      list.innerHTML = '';
-      rooms.forEach((room, index) => {
-        const div = document.createElement('div');
-        div.className = 'room';
-        div.innerHTML = `
-          <label>Name: <input type="text" value="${room.name}" onchange="updateRoom(${index}, 'name', this.value)"></label><br>
-          <label>Length (m): <input type="number" step="0.01" value="${room.length}" onchange="updateRoom(${index}, 'length', parseFloat(this.value))"></label>
-          <label>Width (m): <input type="number" step="0.01" value="${room.width}" onchange="updateRoom(${index}, 'width', parseFloat(this.value))"></label><br>
-          <label>Run Carpet Along: 
-            <select onchange="updateRoom(${index}, 'run', this.value)">
-              <option value="length" ${room.run==='length'?'selected':''}>Length</option>
-              <option value="width" ${room.run==='width'?'selected':''}>Width</option>
-            </select>
-          </label><br>
-          <button onclick="removeRoom(${index})">❌ Remove</button>
-        `;
-        list.appendChild(div);
-      });
-      calculateTotals();
-    }
-
-    function updateRoom(index, field, value) {
-      rooms[index][field] = value;
-      renderRooms();
-    }
-
-    function addRoom() {
-      rooms.push({name:'New Room', length:0, width:0, run:'length'});
-      renderRooms();
-    }
-
-    function removeRoom(index) {
-      rooms.splice(index,1);
-      renderRooms();
-    }
-
-    function calculateTotals() {
-      let totalUsed = 0;
-      let totalWaste = 0;
-      rooms.forEach(room => {
-        if(room.length>0 && room.width>0){
-          let used = room.run==='length' ? room.length : room.width;
-          totalUsed += used;
-          // waste strip = opposite dimension × used length
-          let waste = room.run==='length' ? room.width*room.length : room.length*room.width;
-          totalWaste += waste;
-        }
-      });
-      document.getElementById('totalUsed').textContent = totalUsed.toFixed(2);
-      document.getElementById('totalWaste').textContent = totalWaste.toFixed(2);
-      document.getElementById('totalWithExtra').textContent = (totalUsed*1.10).toFixed(2);
-    }
-
-    document.getElementById('addRoomBtn').addEventListener('click', addRoom);
-
-    // Initialize with one room
-    addRoom();
-  </script>
->>>>>>> 9f3e4cbdcb954156efa1a519d4791857cde24ab2
 </body>
 </html>
