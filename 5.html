@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Multi-Room Carpet Calculator</title>
+
+  <title>Carpet Planner (Universal Logic + Offcut Reuse)</title>
   <style>
     body { font-family: Arial, sans-serif; margin: 2rem; background:#f9fafb; color:#111; }
     h1 { margin-bottom:1rem; }
@@ -11,7 +12,7 @@
     .room button { margin-left:0.5rem; }
     .controls { margin:1rem 0; }
     .result { margin-top:1rem; padding:1rem; border:1px solid #ccc; background:#fff; }
-    em { color:#555; }
+    pre { background:#f4f4f4; padding:0.5rem; border-radius:6px; }
   </style>
 </head>
 <body>
@@ -35,7 +36,7 @@ let rooms = [];
 
 function addRoom() {
   const id = roomId++;
-  rooms.push({id, name:`Room ${id+1}`, length:5, width:4, orientation:'length'});
+  rooms.push({id, name:`Room ${id+1}`, length:0, width:0, orientation:'length'});
   renderRooms();
 }
 
@@ -83,71 +84,126 @@ function renderRooms() {
   });
 }
 
-function roundUp(val, step){ return Math.ceil(val/step)*step; }
+function roundUp(value, roundTo) {
+  return Math.ceil(value / roundTo) * roundTo;
+}
 
-function calcRoom(room, rollWidth, roundTo, offcuts){
+function calcRoom(room, rollWidth, roundTo, offcuts) {
   const L = room.length, W = room.width;
-  let used = room.orientation==='length' ? L : W;
-  let other = room.orientation==='length' ? W : L;
-  let drops = Math.floor(other / rollWidth);
-  let leftover = other - drops*rollWidth;
-  let totalLen = drops * used;
-  let note = "";
-  let wastageStrips = "";
+  let runSide, acrossSide;
 
-  // Try reuse first
-  let reused = false;
-  for(let i=0;i<offcuts.length;i++){
-    if(offcuts[i].width >= W && offcuts[i].length >= L){
-      note = `Filled using offcut from ${offcuts[i].from} (${offcuts[i].width.toFixed(2)}×${offcuts[i].length.toFixed(2)}).`;
-      wastageStrips = "No new wastage, reused existing strip.";
-      offcuts.splice(i,1);
-      reused = true;
-      break;
-    }
+  // Orientation logic
+  if (room.orientation === 'length') {
+    runSide = L;
+    acrossSide = W;
+  } else {
+    runSide = W;
+    acrossSide = L;
   }
 
-  if(!reused){
-    if(leftover>0){
-      if(leftover<=1){
-        let shortLen = (used * leftover / rollWidth) * 2;
-        totalLen += shortLen;
-        note = `Leftover ${leftover.toFixed(2)} m handled with short piece ${shortLen.toFixed(2)} m.`;
-        wastageStrips = `Cut ${shortLen.toFixed(2)} m piece → split into 2 strips (${(shortLen/2).toFixed(2)}×${rollWidth} each). Joined side‑by‑side to cover ${leftover.toFixed(2)}×${used} space.`;
-      } else {
-        totalLen += used;
-        note = `Leftover ${leftover.toFixed(2)} m → full drop ${used.toFixed(2)} m.`;
-        wastageStrips = `One full drop used, offcut width ${leftover.toFixed(2)} m × length ${used.toFixed(2)} m.`;
-        offcuts.push({from:room.name,width:leftover,length:used});
+  let drops = Math.floor(acrossSide / rollWidth);
+  let totalLen = drops * runSide;
+  let leftoverWidth = acrossSide - drops * rollWidth;
+
+  // --- REUSE LOGIC ---
+  let bestIndex = -1;
+  let bestStrip = null;
+
+  for (let i = 0; i < offcuts.length; i++) {
+    const strip = offcuts[i];
+    const coversRoom = strip.width >= acrossSide && strip.length >= runSide;
+    const coversGap = leftoverWidth > 0 && strip.width >= leftoverWidth && strip.length >= runSide;
+
+    if (coversRoom || coversGap) {
+      if (!bestStrip || strip.width < bestStrip.width) {
+        bestStrip = strip;
+        bestIndex = i;
       }
     }
   }
 
-  totalLen = roundUp(totalLen, roundTo);
-  return {roomLen:totalLen, note, wastageStrips};
-}
+  if (bestStrip) {
+    const isRemainder = bestStrip.type === "remainder";
+    const note = isRemainder
+      ? `Filled using remainder strip from ${bestStrip.from} (${bestStrip.width.toFixed(2)}×${bestStrip.length.toFixed(2)}).`
+      : `Filled using offcut from ${bestStrip.from} (${bestStrip.width.toFixed(2)}×${bestStrip.length.toFixed(2)}).`;
+    const remainderNote = isRemainder
+      ? `Remainder strip from ${bestStrip.from} consumed.`
+      : `Offcut from ${bestStrip.from} consumed.`;
 
-function calculateTotal(){
+    offcuts.splice(bestIndex, 1);
+    return {roomLen:0, reused:true, note, wastageStrips:"No new wastage, reused existing strip.", remainderNote};
+  }
+  // --- END REUSE LOGIC ---
+
+  let note = `${drops} drop${drops!==1?'s':''} required (each ${runSide.toFixed(2)} m).`;
+  let wastageStrips = "";
+  let remainderNote = "";
+
+  if (acrossSide <= rollWidth) {
+    // One drop, remainder strip
+    totalLen = runSide;
+    const remainderWidth = rollWidth - acrossSide;
+    if (remainderWidth > 0) {
+      note = `Leftover ${remainderWidth.toFixed(2)} m → full drop ${runSide.toFixed(2)} m.`;
+      wastageStrips = `One full drop used, offcut width ${remainderWidth.toFixed(2)} × ${runSide.toFixed(2)} m.`;
+      offcuts.push({from:room.name,width:remainderWidth,length:runSide,type:"remainder"});
+      remainderNote = `Remainder strip stored: ${remainderWidth.toFixed(2)}×${runSide.toFixed(2)} m.`;
+    } else {
+      note = "No leftover, exact fit.";
+      wastageStrips = "No wastage strip required.";
+      remainderNote = "No remainder strip.";
+    }
+  } else if (leftoverWidth > 0) {
+    if (leftoverWidth <= 1.0) {
+      // Short piece logic
+      let cutLen = leftoverWidth * 1.5;
+      totalLen += cutLen;
+      note = `Leftover ${leftoverWidth.toFixed(2)} m covered by cutting ${cutLen.toFixed(2)} m piece.`;
+      wastageStrips = `Cut ${cutLen.toFixed(2)} m → split into 2 halves (${(cutLen/2).toFixed(2)}×${rollWidth.toFixed(2)} each). Joined side‑by‑side to cover ${leftoverWidth.toFixed(2)}×${runSide.toFixed(2)} space.`;
+      remainderNote = "No remainder strip stored (short piece consumed).";
+    } else {
+      // Full drop logic
+      totalLen += runSide;
+      const remainderWidth = rollWidth - leftoverWidth; // FIXED: store correct remainder
+      note = `Leftover ${leftoverWidth.toFixed(2)} m → full drop ${runSide.toFixed(2)} m.`;
+      wastageStrips = `One full drop used, offcut width ${leftoverWidth.toFixed(2)} × ${runSide.toFixed(2)} m.`;
+      offcuts.push({from:room.name,width:remainderWidth,length:runSide,type:"remainder"});
+      remainderNote = `Remainder strip stored: ${remainderWidth.toFixed(2)}×${runSide.toFixed(2)} m.`;
+    }
+  } else {
+    wastageStrips = "No wastage strip required.";
+    remainderNote = "No remainder strip.";
+  }
+
+  totalLen = roundUp(totalLen, roundTo);
+  return {roomLen:totalLen, reused:false, note, wastageStrips, remainderNote};
+}
+function calculateTotal() {
   const rollWidth = parseFloat(document.getElementById('rollWidth').value);
   const roundTo = parseFloat(document.getElementById('roundTo').value);
-  let total=0;
-  let details="";
-  let offcuts=[];
+  let total = 0;
+  let details = "";
+  let offcuts = [];
 
-  rooms.forEach(room=>{
+  rooms.forEach(room => {
     const res = calcRoom(room, rollWidth, roundTo, offcuts);
     total += res.roomLen;
-    details += `<p><strong>${room.name}</strong>: ${room.length}×${room.width} m → ${res.roomLen.toFixed(2)} m used.<br>
-                 ${res.note}<br><em>Wastage strip: ${res.wastageStrips}</em></p>`;
+
+    // Structured installer-style output
+    details += `<pre>
+${room.name}: ${room.length.toFixed(2)} × ${room.width.toFixed(2)} m → ${res.roomLen.toFixed(2)} m used
+- Note: ${res.note}
+- Wastage: ${res.wastageStrips}
+- Remainder: ${res.remainderNote}
+</pre>`;
   });
-  const withWastage = total*1.10; // add 10%
+
+  const withWastage = total * 1.10;
   document.getElementById('output').innerHTML =
     `${details}<hr><strong>Total carpet length (before wastage): ${total.toFixed(2)} m</strong><br>
      <strong>Total with 10% wastage/finishing: ${withWastage.toFixed(2)} m</strong>`;
 }
 
-// initialize with one room
 addRoom();
 </script>
-</body>
-</html>
